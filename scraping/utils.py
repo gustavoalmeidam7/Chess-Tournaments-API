@@ -26,15 +26,3 @@ def safe_line(parent, tag, **attrs):
 
 def after_colon(text):
     return text.partition(':')[-1].strip()
-
-#Por Emerson Machado 04/05/2025
-
-# utils.py
-from bs4 import BeautifulSoup
-
-def get_hidden_fields(soup):
-    return {
-        "__VIEWSTATE":          soup.find("input", {"name": "__VIEWSTATE"})["value"],
-        "__VIEWSTATEGENERATOR": soup.find("input", {"name": "__VIEWSTATEGENERATOR"})["value"],
-        "__EVENTVALIDATION":    soup.find("input", {"name": "__EVENTVALIDATION"})["value"],
-    }
