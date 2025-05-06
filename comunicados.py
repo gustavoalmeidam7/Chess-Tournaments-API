@@ -68,5 +68,6 @@ print(f"Total de comunicados: {len(lista)}")
 # Salva em JSON
 with open("comunicados.json", "w", encoding="utf-8") as f:
     json.dump(lista, f, ensure_ascii=False, indent=4)
+    
 fim = time.time()
 print(f'Performance de {fim-inicio:.2f} segundos')

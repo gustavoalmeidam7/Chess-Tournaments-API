@@ -1,60 +1,106 @@
+import re
+import json
 import requests
 from bs4 import BeautifulSoup
-import json
-from utils import get_hidden_fields, safe_find, after_colon
+from utils import get_hidden_fields
 
 BASE_URL = "https://www.cbx.org.br"
-URL = f"{BASE_URL}/rating"
+URL      = f"{BASE_URL}/rating"
+UF       = "AL"  # alterar para qualquer outro estado
+
 session = requests.Session()
 
-# GET inicial e postback de SP (igual antes)...
+def extract_pages(soup):
+    """
+    Extrai de todos os links __doPostBack('...','Page$X') os números X.
+    Retorna um set de inteiros.
+    """
+    pages = set()
+    for a in soup.find_all("a", href=True):
+        m = re.search(r"Page\$(\d+)", a["href"])
+        if m:
+            pages.add(int(m.group(1)))
+    return pages
+
+# 1) GET inicial para página 1 + filtro de UF
 resp = session.get(URL)
 soup = BeautifulSoup(resp.text, "html.parser")
 hidden = get_hidden_fields(soup)
 
-post_data = {
+# monta dados do filtro de UF + primeiro postback
+payload = {
     **hidden,
-    "ctl00$ContentPlaceHolder1$cboUF": "SP",
+    "ctl00$ContentPlaceHolder1$cboUF": UF,
     "__EVENTTARGET":   "ctl00$ContentPlaceHolder1$cboUF",
     "__EVENTARGUMENT": "",
     "ctl00$ContentPlaceHolder1$btnBuscar": "Buscar"
 }
-resp2 = session.post(URL, data=post_data)
-soup2 = BeautifulSoup(resp2.text, "html.parser")
+resp = session.post(URL, data=payload)
+soup = BeautifulSoup(resp.text, "html.parser")
+hidden = get_hidden_fields(soup)
 
-# Localiza a tabela
-table = soup2.find("table", class_="grid")
+# descobre todas as páginas a visitar (inclui página 1)
+to_visit = sorted(extract_pages(soup) | {1})
+visited  = set()
+all_players = []
 
-# Captura o total
-total = after_colon(safe_find(table, "caption"))
+while to_visit:
+    page = to_visit.pop(0)
+    if page in visited:
+        continue
+    visited.add(page)
 
-# Pega todas as linhas
-all_rows = table.find_all("tr")
+    print(f"Scraping página {page} de UF = {UF}…")
+    # faz o postback para cada página (GET apenas para 1 já feito)
+    if page > 1:
+        post = {
+            **hidden,
+            "__EVENTTARGET":   "ctl00$ContentPlaceHolder1$gdvMain",
+            "__EVENTARGUMENT": f"Page${page}",
+        }
+        resp = session.post(URL, data=post)
+        soup = BeautifulSoup(resp.text, "html.parser")
+        hidden = get_hidden_fields(soup)
 
-# 1) Cabeçalho: a primeira linha
-header_cells = all_rows[0].find_all("th")
-colunas = [th.get_text(strip=True) for th in header_cells]
+    # extrai tabela e linhas
+    table = soup.find("table", class_="grid")
+    if not table:
+        continue
 
-# 2) Corpo: todas as outras linhas
-dados = []
-for row in all_rows[1:]:
-    # Some tables podem ter <th> também em linhas de agrupamento; aqui assumimos <td>
-    cells = row.find_all("td")
-    if not cells:
-        continue  # pula linhas sem <td>
-    valores = [td.get_text(strip=True) for td in cells]
-    registro = dict(zip(colunas, valores))
-    cbx_id = registro.get("ID CBX", "").strip()
-    registro["link"] = f"{BASE_URL}/jogador/{cbx_id}" if cbx_id else ""
+    # pega todas as tr diretas (sem descer nas aninhadas)
+    rows = table.find_all("tr", recursive=False)
 
-    dados.append(registro)
+    # primeira linha é sempre cabeçalho
+    headers = [th.get_text(strip=True) for th in rows[0].find_all("th")]
 
-# Monta o JSON final
+    # percorre linhas de dados
+    for row in rows[1:]:
+        # pula paginação
+        if "grid-pager" in row.get("class", []):
+            continue
+        cells = row.find_all("td")
+        if not cells:
+            continue
+        vals = [td.get_text(strip=True) for td in cells]
+        rec = dict(zip(headers, vals))
+        cbx_id = rec.get("ID CBX", "")
+        rec["link"] = f"{BASE_URL}/jogador/{cbx_id}" if cbx_id else ""
+        all_players.append(rec)
+
+    # descobre novas páginas aparecendo no pager desta página
+    new_pages = extract_pages(soup)
+    for p in sorted(new_pages):
+        if p not in visited and p not in to_visit:
+            to_visit.append(p)
+
+# grava resultado
 resultado = {
-    "total_jogadores": total,
-    "jogadores": dados
+    "UF": UF,
+    "total_paginas": len(visited),
+    "jogadores": all_players
 }
 
-# Salva
-with open("jogadores_sp.json", "w", encoding="utf-8") as f:
+with open(f"jogadores_{UF.lower()}.json", "w", encoding="utf-8") as f:
     json.dump(resultado, f, ensure_ascii=False, indent=4)
+
+print(f"✔️  Coletados {len(all_players)} jogadores em {len(visited)} páginas.")  
