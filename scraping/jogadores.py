@@ -3,10 +3,13 @@ import json
 import requests
 from bs4 import BeautifulSoup
 from utils import get_hidden_fields
+import time
+
+inicio = time.time()
 
 BASE_URL = "https://www.cbx.org.br"
 URL      = f"{BASE_URL}/rating"
-UF       = "AL"  # alterar para qualquer outro estado
+UF       = "RR"  # alterar para qualquer outro estado
 
 session = requests.Session()
 
@@ -95,12 +98,14 @@ while to_visit:
 
 # grava resultado
 resultado = {
-    "UF": UF,
-    "total_paginas": len(visited),
-    "jogadores": all_players
+    "UF":               UF,
+    "total_paginas":    len(visited),
+    "total_jogadores":  len(all_players),
+    "jogadores":        all_players
 }
 
 with open(f"jogadores_{UF.lower()}.json", "w", encoding="utf-8") as f:
     json.dump(resultado, f, ensure_ascii=False, indent=4)
 
 print(f"✔️  Coletados {len(all_players)} jogadores em {len(visited)} páginas.")  
+print(f"⏱️  Tempo total: {time.time()-inicio:.2f} segundos")
