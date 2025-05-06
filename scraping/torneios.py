@@ -11,8 +11,8 @@ BASE_URL      = "https://www.cbx.org.br"
 TORNEIOS_URL  = f"{BASE_URL}/torneios"
 
 # --- CONFIGURAÇÃO DE FILTRO ---
-ANO = "2015"
-# Mapeie o nome do mês para o value correto do <option> (inspecione no HTML real)
+ANO = "2010"
+# Cada mês tem seu número respectivo ao calendário, para selecionar 'Todos' deixe vazio ""
 MES = ""
 
 session = requests.Session()
@@ -56,7 +56,7 @@ while to_visit:
         continue
     visited.add(page)
 
-    print(f"Scraping torneios — página {page} de Ano={ANO}, Mês={MES}…")
+    print(f"Página {page} de Ano={ANO}, Mês={MES}")
 
     if page > 1:
         post = {
@@ -92,9 +92,17 @@ while to_visit:
         }
         lista_torneios.append(t)
 
+resultado = {
+    "ano":              ANO,
+    "mês":              MES,    
+    "total_paginas":    len(visited),
+    "total_torneios":   len(lista_torneios),
+    "torneios":         lista_torneios
+}
+
 # 5) Grava JSON final
 with open(f"torneios_{ANO}_{MES}.json", "w", encoding="utf-8") as f:
-    json.dump(lista_torneios, f, ensure_ascii=False, indent=4)
+    json.dump(resultado, f, ensure_ascii=False, indent=4)
 
 print(f"✔️  Coletados {len(lista_torneios)} torneios em {len(visited)} páginas para Ano={ANO}, Mês={MES}")
 print(f"⏱️  Tempo total: {time.time()-inicio:.2f}s")
