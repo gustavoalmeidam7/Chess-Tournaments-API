@@ -1,21 +1,14 @@
 import re
-import json
 import requests
-from fastapi import FastAPI, Query, HTTPException
+from fastapi import APIRouter, HTTPException
 from bs4 import BeautifulSoup
-from utils import get_hidden_fields
 from typing import List, Optional
+from utils import get_hidden_fields
 
-app = FastAPI(
-    title="CBX Comunicados API",
-    version="1.0.0",
-    docs_url="/docs",
-    redoc_url="/redoc"
-)
+router = APIRouter(prefix="/comunicados", tags=["comunicados"])
 
-BASE_URL = 'https://www.cbx.org.br'
+BASE_URL        = 'https://www.cbx.org.br'
 COMUNICADOS_URL = f'{BASE_URL}/comunicados'
-
 
 def scrape_comunicados(max_pages: Optional[int] = None) -> List[dict]:
     session = requests.Session()
@@ -25,7 +18,6 @@ def scrape_comunicados(max_pages: Optional[int] = None) -> List[dict]:
     soup = BeautifulSoup(resp.text, 'html.parser')
     hidden = get_hidden_fields(soup)
 
-    # função interna para extrair páginas
     def extract_pages(soup):
         pages = set()
         for a in soup.find_all("a", href=True):
@@ -34,18 +26,14 @@ def scrape_comunicados(max_pages: Optional[int] = None) -> List[dict]:
                 pages.add(int(m.group(1)))
         return pages
 
-    # descobrir páginas iniciais
-    pages_to_visit = [1]
-    visited = set()
-    comunicados = []
-
-    # limitar total de páginas
     first_pages = extract_pages(soup) | {1}
     if max_pages:
-        # considera apenas até max_pages
         pages_to_visit = [p for p in sorted(first_pages) if p <= max_pages]
     else:
         pages_to_visit = sorted(first_pages)
+
+    visited = set()
+    comunicados = []
 
     while pages_to_visit:
         page = pages_to_visit.pop(0)
@@ -53,7 +41,6 @@ def scrape_comunicados(max_pages: Optional[int] = None) -> List[dict]:
             continue
         visited.add(page)
 
-        # postback para outras páginas
         if page > 1:
             post_data = {
                 **hidden,
@@ -66,7 +53,6 @@ def scrape_comunicados(max_pages: Optional[int] = None) -> List[dict]:
             soup = BeautifulSoup(resp.text, 'html.parser')
             hidden = get_hidden_fields(soup)
 
-        # coleta comunicados da página
         for a in soup.find_all("a", id=re.compile(r"ContentPlaceHolder1_gdvMain_hlkTitulo_\d+")):
             titulo = a.get_text(strip=True)
             link = BASE_URL + a["href"].strip()
@@ -78,7 +64,6 @@ def scrape_comunicados(max_pages: Optional[int] = None) -> List[dict]:
                 "link": link
             })
 
-        # agenda próximas páginas
         if not max_pages:
             novas = extract_pages(soup)
             for p in sorted(novas):
@@ -87,11 +72,9 @@ def scrape_comunicados(max_pages: Optional[int] = None) -> List[dict]:
 
     return comunicados
 
-
-@app.get("/comunicados", response_model=List[dict])
-def get_comunicados(paginas: Optional[int] = Query(None, ge=1, description="Número máximo de páginas a raspar")):
+@router.get("", response_model=List[dict])
+def get_comunicados(paginas: Optional[int] = None):
     """
-    Retorna lista de comunicados da CBX.
-    Parâmetro opcional 'paginas' limita quantas páginas serão raspadas.
+    Retorna lista de comunicados da CBX. Parâmetro opcional 'paginas' limita quantas páginas serão raspadas.
     """
     return scrape_comunicados(max_pages=paginas)
