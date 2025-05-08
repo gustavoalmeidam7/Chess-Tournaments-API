@@ -1,25 +1,17 @@
-from fastapi import FastAPI, Query, HTTPException # type: ignore
-from typing import List, Optional
 import re
-import requests # type: ignore
-from bs4 import BeautifulSoup  # type: ignore
+import requests
+from fastapi import APIRouter, HTTPException
+from bs4 import BeautifulSoup
+from typing import List, Optional
 from utils import get_hidden_fields
 
-app = FastAPI(
-    title="CBX Notícias API",
-    version="1.0.0",
-    docs_url="/docs",
-    redoc_url="/redoc"
-)
+router = APIRouter(prefix="/noticias", tags=["notícias"])
 
-BASE_URL = 'https://www.cbx.org.br'
+BASE_URL     = 'https://www.cbx.org.br'
 NOTICIAS_URL = f'{BASE_URL}/noticias'
 
 
 def scrape_noticias(max_pages: Optional[int] = None) -> List[dict]:
-    """
-    Coleta notícias da CBX até max_pages. Se max_pages for None, coleta todas as páginas disponíveis.
-    """
     session = requests.Session()
     resp = session.get(NOTICIAS_URL)
     if resp.status_code != 200:
@@ -27,7 +19,6 @@ def scrape_noticias(max_pages: Optional[int] = None) -> List[dict]:
     soup = BeautifulSoup(resp.text, 'html.parser')
     hidden = get_hidden_fields(soup)
 
-    # Descobre total de páginas
     page_numbers = [int(a.text) for a in soup.find_all("a", href=True) if a.text.isdigit()]
     num_pages = max(page_numbers) if page_numbers else 1
     if max_pages:
@@ -47,7 +38,6 @@ def scrape_noticias(max_pages: Optional[int] = None) -> List[dict]:
             soup = BeautifulSoup(resp.text, 'html.parser')
             hidden = get_hidden_fields(soup)
 
-        # Extrai notícias da página
         links = soup.find_all(
             "a",
             id=re.compile(r"ContentPlaceHolder1_gdvMain_hlkTitulo_\d+")
@@ -64,11 +54,10 @@ def scrape_noticias(max_pages: Optional[int] = None) -> List[dict]:
             })
     return noticias
 
-
-@app.get("/noticias", response_model=List[dict])
-def get_noticias(paginas: Optional[int] = Query(None, ge=1, description="Número máximo de páginas a raspar")):
+@router.get("", response_model=List[dict])
+def get_noticias(paginas: Optional[int] = None):
     """
-    Endpoint que retorna as notícias da CBX.
-    Parâmetro opcional 'paginas' limita quantas páginas serão raspadas.
+    Retorna lista de notícias da CBX. Parâmetro opcional 'paginas' limita quantas páginas serão raspadas.
     """
     return scrape_noticias(max_pages=paginas)
+
