@@ -7,8 +7,6 @@ router = APIRouter(prefix="/tournaments", tags=["tournaments"])
 # Mapeie as federações ao módulo e à função fetch
 FEDERATIONS = {
     "cbx": ("local.cbx.cbx_tournaments", "fetch_tournaments"),
-    "fide": ("international.fide.fide_tournaments", "fetch_tournaments"),
-    "uscf": ("local.united_states.uscf.uscf_tournaments", "fetch_tournaments"),
 }
 
 @router.get("", response_model=List[dict])
