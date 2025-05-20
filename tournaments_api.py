@@ -14,7 +14,7 @@ def get_tournaments(
     federation: Optional[str] = Query(
         None, description="Sigla da federação (cbx, fide, uscf…). Se omitido, agrega todas."
     ),
-    year: str = Query("", min_length=4, max_length=4, description="Ano, ex: 2025"),
+    year: str = Query(..., min_length=4, max_length=4, description="Ano, ex: 2025"),
     month: str = Query("", max_length=2, description="Mês (1–12) ou vazio para “Todos”"),
     limit: int = Query(1, ge=1, description="Máximo de torneios a retornar")
 ):
