@@ -16,14 +16,14 @@ def get_tournaments(
     ),
     year: str = Query("", min_length=4, max_length=4, description="Ano, ex: 2025"),
     month: str = Query("", max_length=2, description="Mês (1–12) ou vazio para “Todos”"),
-    pages: int = Query(1, ge=1, description="Máximo de torneios a retornar")
+    limit: int = Query(1, ge=1, description="Máximo de torneios a retornar")
 ):
     results: List[dict] = []
 
     def call_fetch(module_path, func_name):
         mod = importlib.import_module(module_path)
         func = getattr(mod, func_name)
-        return func(year, month, pages)
+        return func(year, month, limit)
 
     if federation:
         key = federation.lower()
@@ -40,7 +40,7 @@ def get_tournaments(
             except Exception:
                 # se algum scraping falhar, ignora e continua
                 continue
-        # garante que não ultrapasse pages no total
-        results = results[:pages]
+        # garante que não ultrapasse limit no total
+        results = results[:limit]
 
     return results
