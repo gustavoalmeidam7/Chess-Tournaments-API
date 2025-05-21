@@ -20,9 +20,9 @@ def extract_pages(soup):
     return pages
 
 def scrape_tournaments(
-    year: Optional[str],
+    year:  Optional[str],
     month: Optional[str],
-    max_pages: Optional[int]
+    limit: Optional[int]
 ) -> List[dict]:
     session = requests.Session()
 
@@ -52,9 +52,6 @@ def scrape_tournaments(
     hidden = get_hidden_fields(soup)
 
     to_visit = sorted(extract_pages(soup) | {1})
-    if max_pages:
-        to_visit = [p for p in to_visit if p <= max_pages]
-
     visited = set()
     tournaments_list = []
 
@@ -77,10 +74,9 @@ def scrape_tournaments(
             hidden = get_hidden_fields(soup)
 
         # agenda novas páginas encontradas
-        if not max_pages:
-            for p in extract_pages(soup):
-                if p not in visited and p not in to_visit:
-                    to_visit.append(p)
+        for p in extract_pages(soup):
+            if p not in visited and p not in to_visit:
+                to_visit.append(p)
 
         # extrai torneios da página atual
         for i, table in enumerate(soup.find_all("table", class_="torneios")):
@@ -101,6 +97,9 @@ def scrape_tournaments(
             }
             tournaments_list.append(t)
 
+            # Checagem se atingiu o limite de torneios
+            if limit and len(tournaments_list) >= limit:
+                return tournaments_list
     return tournaments_list
 
 
@@ -108,9 +107,9 @@ def scrape_tournaments(
 def get_tournaments(
     year:  Optional[str] = Query(None, min_length=4, max_length=4, description="Desired year, ex: 2025"),
     month: Optional[str] = Query(None, min_length=1, max_length=2, description="Número do month (1-12), ex: 5 para Maio"),
-    pages: Optional[int] = Query(None, ge=1, description="Número máximo de pages a raspar")
+    limit: Optional[int] = Query(None, ge=1, description="Número máximo de pages a raspar")
 ):
     """
     Retorna lista de torneios da CBX filtrados por year e month.
     """
-    return scrape_tournaments(year, month, pages)
+    return scrape_tournaments(year, month, limit)
